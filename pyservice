@@ -1,0 +1,70 @@
+#!/usr/bin/bash
+# Python systemd service creator for Ubuntu 20.04
+
+function help {
+    echo "pyservice usage:"
+    echo "  pyservice [-h, --help, -r, --remove] <python-file-path>"
+    echo -e "  Options:\n"
+    echo "      -h,--help           		  prints this help message"
+    echo "      -r,--remove <service-name>          removes the given service"
+}
+
+
+if [ "$1" = "-h" ] || [ $1 = "--help" ]; then
+    help
+    exit 0
+elif [ "$1" = "-r" ] || [ $1 = "--remove" ]; then
+    sudo systemctl stop $2
+    sudo systemctl disable $2
+    sudo rm /etc/systemd/system/$2.service
+    echo "Done deleting service $2"
+    exit 0
+fi
+
+file="$1"
+
+echo -e "Creating service with file $file...\n"
+
+# Checking that the python file provided exists
+if ! [ -f "$file" ]; then
+    echo "Cannot find file \"$file\". Please try again with a valid file path."
+    exit 1
+else
+    echo "Found file \"$file\"!"
+fi
+
+# Checking if the systemd folder exists
+if ! [ -d "/etc/systemd/system" ]; then
+    echo "Cannot locate \"/etc/systemd/system\""
+    exit 1
+else
+    echo "\"/etc/systemd/system\" located"
+fi
+
+py3=`type -P python3`
+if [ $? -eq 0 ]; then
+    echo "Python3 found at \"$py3\""
+else
+    echo "Make sure you have Python3 installed!"
+fi	
+
+absolute_path=`readlink -e $file`
+file_name=${file%%.*}
+
+cat << EOF | sudo tee /etc/systemd/system/$file_name.service
+[Unit]
+Description=Automatically created service for $file
+
+[Service]
+ExecStart=$py3 $absolute_path
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo -e "\nDone creating service \"$file_name.service\""
+
+sudo systemctl start $file_name
+sudo systemctl enable $file_name
+echo ""
+sudo systemctl status $file_name
